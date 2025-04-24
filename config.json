@@ -1,6 +1,25 @@
 {
-    "allowed_extensions": [".py", ".txt", ".json", ".env", ".yml", ".yaml", ".dockerfile"],
-    "ignored_dirs": [".git", "__pycache__", ".idea", ".vscode"],
-    "force_include": ["Dockerfile"],
-    "force_exclude": ["logs/", "data/"]
+    "allowed_extensions": [
+        ".py",
+        ".txt",
+        ".json",
+        ".env",
+        ".yml",
+        ".yaml",
+        ".dockerfile",
+        "Dockerfile",
+        ".gitignore",
+        ".dockerignore"
+    ],
+    "ignored_dirs": [
+        ".git",
+        "__pycache__",
+        ".idea",
+        ".vscode",
+        "node_modules",
+        "venv",
+        ".env",
+        "dist",
+        "build"
+    ]
 }

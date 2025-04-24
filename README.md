@@ -1,61 +1,76 @@
 # Project Dumper
 
 ## Overview
-This utility is a command-line tool to recursively scan a given directory, print a tree view of the project structure, and dump the contents of selected files into a single text file. It's particularly useful for feeding entire codebases into LLMs for analysis or debugging purposes.
+**Project Dumper** is a command-line utility that recursively scans a directory, displays a tree view of its structure, and exports the contents of selected files into a single text file. It's ideal for feeding large codebases into LLMs for analysis or debugging.
 
 ## Features
-- Tree-style directory structure output
-- Dump file contents into a single readable `.txt` file
-- Configurable inclusion/exclusion rules via `config.json`
-- Prevents duplicate file dumps
-- Supports force-inclusion and force-exclusion of specific files or directories
+- Visual tree representation of the directory structure
+- Dumps file contents into a single `.txt` file
+- Customizable filtering via a `config.json` file
+- Avoids duplicate file dumps
+- Force include or exclude specific files or directories
 
 ## Getting Started
 
-### 1. Clone or Download
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/comrados/project-dump.git
+cd project-dump
 ```
 
-### 2. Configuration
-Edit the `config.json` file to define:
-- Allowed file extensions
-- Ignored directories
-- Force-included and force-excluded paths
+### 2. Configure
+Edit or create a `config.json` file to specify the file types and directories to include or exclude.
 
-Example:
+Example `config.json`:
 ```json
 {
-    "allowed_extensions": [".py", ".txt", ".json", ".env", ".yml", ".yaml", ".dockerfile"],
-    "ignored_dirs": [".git", "__pycache__", ".idea", ".vscode"],
-    "force_include": ["Dockerfile"],
-    "force_exclude": ["logs/", "data/"]
+  "allowed_extensions": [
+    ".py",
+    ".txt",
+    ".json",
+    ".env",
+    ".yml",
+    ".yaml",
+    ".dockerfile",
+    "Dockerfile",
+    ".gitignore",
+    ".dockerignore"
+  ],
+  "ignored_dirs": [
+    ".git",
+    "__pycache__",
+    ".idea",
+    ".vscode",
+    "node_modules",
+    "venv",
+    ".env",
+    "dist",
+    "build"
+  ]
 }
-
 ```
 
-### 3. Usage
-Run the script from the command line:
+### 3. Run the Script
+Use the command below to generate a project dump:
 
 ```bash
-python project_dump.py /path/to/your/project --config config.json --output output.txt
+python project_dump.py /path/to/project --config config.json --output output.txt
 ```
 
-- `--config` (optional): Path to your custom config file.
-- `--output` (optional): Path where the result file will be saved.
+**Options:**
+- `--config`: (Optional) Path to a custom configuration file.
+- `--output`: (Optional) Output file name (default: `project_dump.txt`).
 
-### 4. Output
-The script creates a single file (default `project_dump.txt`) that includes:
-- A visual directory tree of the project
-- The full contents of included files under appropriate headers
+### 4. Output Format
+The generated output file includes:
+- A hierarchical view of the project directory
+- The contents of each selected file, grouped under clear headers
 
 ## License
 Copyright (c) 2025 comrados
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
