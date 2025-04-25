@@ -1,233 +1,156 @@
 import os
 import json
 import argparse
+from datetime import datetime
 from pathlib import Path
-import textwrap
-
-# --- Default configuration embedded here ---
-DEFAULT_CONFIG = {
-    "allowed_extensions": [
-        ".py",
-        ".txt",
-        ".json",
-        ".env",
-        ".yml",
-        ".yaml",
-        ".dockerfile",
-        "Dockerfile",
-        ".gitignore",
-        ".dockerignore"
-    ],
-    "ignored_dirs": [
-        ".git",
-        "__pycache__",
-        ".idea",
-        ".vscode",
-        "node_modules",
-        "venv",
-        ".env",
-        "dist",
-        "build"
-    ]
-}
-# --- End of Default configuration ---
 
 def load_config(config_path):
-    """Loads configuration from a JSON file, using embedded defaults if necessary."""
+    """Load configuration from a JSON file."""
     try:
-        with open(config_path, 'r') as f:
-            content = f.read()
-            if not content:
-                print(f"Warning: Config file '{config_path}' is empty. Using built-in default config.")
-                return DEFAULT_CONFIG, "built-in defaults (config file empty)"
-
-            loaded_config = json.loads(content)
-            # Start with defaults, override with loaded, ensure keys exist
-            final_config = DEFAULT_CONFIG.copy()
-            final_config.update(loaded_config)
-
-            # Validate essential keys after potential overwrite
-            if "allowed_extensions" not in final_config or "ignored_dirs" not in final_config:
-                 print(f"Warning: Config file '{config_path}' is missing essential keys ('allowed_extensions', 'ignored_dirs'). Reverting to built-in defaults.")
-                 return DEFAULT_CONFIG, f"built-in defaults (config file '{config_path}' incomplete)"
-
-            print(f"Successfully loaded and merged configuration from '{config_path}'.")
-            return final_config, f"'{config_path}' merged with defaults"
-
+        # Always resolve config relative to script location
+        script_dir = Path(__file__).parent.resolve()
+        config_path = (script_dir / config_path).resolve()
+        
+        with open(config_path, 'r') as config_file:
+            config = json.load(config_file)
+        print(f"Successfully loaded configuration from '{config_path}'.")
+        return config
     except FileNotFoundError:
-        print(f"Info: Config file '{config_path}' not found. Using built-in default config.")
-        return DEFAULT_CONFIG, "built-in defaults (config file not found)"
+        print(f"Configuration file '{config_path}' not found. Using default configuration.")
+        return {
+            "allowed_extensions": [".py", ".txt", ".json", ".env", ".yml", ".yaml", ".dockerfile", "Dockerfile", ".gitignore", ".dockerignore"],
+            "ignored_dirs": [".git", "__pycache__", ".idea", ".vscode", "node_modules", "venv", ".env", "dist", "build"]
+        }
     except json.JSONDecodeError:
-        print(f"Error: Config file '{config_path}' contains invalid JSON. Using built-in default config.")
-        return DEFAULT_CONFIG, f"built-in defaults (invalid JSON in '{config_path}')"
-    except Exception as e:
-        print(f"Error loading config file '{config_path}': {e}. Using built-in default config.")
-        return DEFAULT_CONFIG, f"built-in defaults (error loading '{config_path}')"
+        print(f"Error parsing configuration file '{config_path}'. Using default configuration.")
+        return {
+            "allowed_extensions": [".py", ".txt", ".json", ".env", ".yml", ".yaml", ".dockerfile", "Dockerfile", ".gitignore", ".dockerignore"],
+            "ignored_dirs": [".git", "__pycache__", ".idea", ".vscode", "node_modules", "venv", ".env", "dist", "build"]
+        }
 
-def build_tree(start_path, ignored_dirs, allowed_extensions):
-    """Builds the directory tree string and collects files to dump."""
-    tree_lines = []
-    files_to_dump = []
-    start_path = Path(start_path).resolve()
+def is_allowed_file(file_path, allowed_extensions):
+    """Check if a file should be included based on its extension."""
+    _, ext = os.path.splitext(file_path)
+    
+    # Check if the extension or full filename is in allowed_extensions
+    return ext.lower() in allowed_extensions or os.path.basename(file_path) in allowed_extensions
 
-    ignored_dirs_set = set(ignored_dirs)
-    allowed_extensions_set = set(allowed_extensions)
+def get_tree_structure(path, prefix="", ignored_dirs=None, allowed_extensions=None, processed_files=None):
+    """Generate a tree structure of the directory."""
+    if ignored_dirs is None:
+        ignored_dirs = []
+    if allowed_extensions is None:
+        allowed_extensions = []
+    if processed_files is None:
+        processed_files = set()
+    
+    tree_output = ""
+    items = sorted(os.listdir(path))
+    
+    # First, add directories
+    dirs = [item for item in items if os.path.isdir(os.path.join(path, item)) and item not in ignored_dirs]
+    for i, dir_name in enumerate(dirs):
+        is_last_dir = i == len(dirs) - 1
+        dir_path = os.path.join(path, dir_name)
+        
+        # Add directory to the tree
+        tree_output += f"{prefix}{'└── ' if is_last_dir else '├── '}{dir_name}/\n"
+        
+        # Process subdirectory with updated prefix
+        new_prefix = f"{prefix}{'    ' if is_last_dir else '│   '}"
+        tree_output += get_tree_structure(
+            dir_path, 
+            new_prefix, 
+            ignored_dirs, 
+            allowed_extensions, 
+            processed_files
+        )
+    
+    # Then, add files
+    files = [item for item in items if os.path.isfile(os.path.join(path, item))]
+    allowed_files = [f for f in files if is_allowed_file(f, allowed_extensions)]
+    
+    for i, file_name in enumerate(allowed_files):
+        is_last_file = i == len(allowed_files) - 1
+        file_path = os.path.join(path, file_name)
+        
+        # Add file to the tree and to processed files
+        tree_output += f"{prefix}{'└── ' if is_last_file else '├── '}{file_name}\n"
+        processed_files.add(os.path.abspath(file_path))
+    
+    return tree_output
 
-    if start_path.name in ignored_dirs_set:
-        print(f"Warning: Root directory '{start_path.name}' is in ignored_dirs. Skipping.")
-        return "", []
-
-    tree_lines.append(f"{start_path.name}/")
-
-    # Use topdown=True to allow pruning ignored dirs
-    for root, dirs, files in os.walk(start_path, topdown=True, onerror=lambda err: print(f"Error accessing {err.filename}: {err.strerror}")):
-        current_path = Path(root)
-
-        # Prune ignored directories before descending
-        dirs[:] = [d for d in dirs if d not in ignored_dirs_set]
-
-        try:
-            relative_path = current_path.relative_to(start_path)
-            level = len(relative_path.parts)
-        except ValueError:
-             print(f"Warning: Could not determine relative path for {current_path}. Skipping content.")
-             continue
-
-        indent = '    ' * level
-        sub_indent = '    ' * (level + 1)
-
-        dirs.sort()
-        files.sort()
-
-        for d in dirs:
-            tree_lines.append(f"{sub_indent}├── {d}/")
-
-        files_in_dir = files # No need to copy if not modifying 'files' list itself
-        for i, f_name in enumerate(files_in_dir):
-            file_ext = os.path.splitext(f_name)[1]
-            is_allowed_name = f_name in allowed_extensions_set
-            is_allowed_ext = file_ext in allowed_extensions_set and file_ext != ''
-
-            if is_allowed_name or is_allowed_ext:
-                # Determine connector style for the tree view
-                is_last_item = (i == len(files_in_dir) - 1) and not dirs
-                connector = "└──" if is_last_item else "├──"
-                tree_lines.append(f"{sub_indent}{connector} {f_name}")
-
-                file_relative_path = relative_path / f_name
-                files_to_dump.append(str(file_relative_path))
-
-    return "\n".join(tree_lines), files_to_dump
-
-
-def dump_files(start_path, relative_file_paths, output_file):
-    """Dumps the content of specified files into the output file."""
-    start_path = Path(start_path).resolve()
-    output_file.write("\n\n" + "=" * 80 + "\n")
-    output_file.write(" " * 30 + "FILE CONTENTS\n")
-    output_file.write("=" * 80 + "\n\n")
-
-    dumped_paths = set()
-
-    for rel_path_str in relative_file_paths:
-        rel_path = Path(rel_path_str.replace('\\', '/')) # Normalize separators
-        rel_path_key = str(rel_path)
-
-        if rel_path_key in dumped_paths:
-            print(f"Warning: Skipping duplicate file path '{rel_path_key}'")
-            continue
-
-        full_path = start_path / rel_path
-        try:
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as infile:
-                content = infile.read()
-                output_file.write(f"---\n")
-                output_file.write(f"File: {rel_path_key}\n")
-                output_file.write(f"---\n\n")
-                output_file.write(content)
-                output_file.write("\n\n")
-                dumped_paths.add(rel_path_key)
-        except FileNotFoundError:
-             print(f"Warning: File '{full_path}' not found during dump phase. Skipping.")
-        except IsADirectoryError:
-             print(f"Warning: Path '{full_path}' is a directory, not a file. Skipping dump.")
-        except Exception as e:
-            print(f"Error reading file {full_path}: {e}")
-            output_file.write(f"---\n")
-            output_file.write(f"File: {rel_path_key}\n")
-            output_file.write(f"---\n\n")
-            output_file.write(f"[Error reading file: {e}]\n\n")
-            dumped_paths.add(rel_path_key)
-
-
-def format_list_for_header(items):
-    """Formats a list nicely for the header, wrapping lines."""
-    if not items:
-        return "  []"
-    # Wrap items, indent subsequent lines
-    return textwrap.fill(str(items), width=70, initial_indent='  ', subsequent_indent='  ')
+def dump_file_contents(path, output_file, ignored_dirs, allowed_extensions):
+    """Dump the contents of allowed files to the output file."""
+    processed_files = set()
+    
+    # First, create and write the tree structure
+    tree_structure = get_tree_structure(
+        path, 
+        ignored_dirs=ignored_dirs, 
+        allowed_extensions=allowed_extensions,
+        processed_files=processed_files
+    )
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        # Write header
+        f.write(f"# PROJECT DUMP: {os.path.abspath(path)}\n")
+        f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        # Write tree structure
+        f.write("## Directory Structure\n```\n")
+        f.write(f"{os.path.basename(path)}/\n")
+        f.write(tree_structure)
+        f.write("```\n\n")
+        
+        # Write file contents
+        f.write("## File Contents\n\n")
+        
+        file_count = 0
+        for file_path in sorted(processed_files):
+            rel_path = os.path.relpath(file_path, path)
+            f.write(f"### {rel_path}\n```\n")
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+                    f.write(file.read())
+            except Exception as e:
+                f.write(f"[Error reading file: {str(e)}]\n")
+            
+            f.write("\n```\n\n")
+            file_count += 1
+            
+    return file_count
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a project tree and dump selected file contents.")
-    parser.add_argument("project_dir", help="Path to the project directory.")
-    parser.add_argument("--config", default="config.json", help="Path to the configuration JSON file (default: config.json).")
-    parser.add_argument("--output", default="project_dump.txt", help="Path to the output file (default: project_dump.txt).")
-
+    parser = argparse.ArgumentParser(description="Project Dumper - Export project structure and file contents to a text file")
+    parser.add_argument("path", nargs="?", default=".", help="Path to the project directory")
+    parser.add_argument("--config", default="config.json", help="Path to the configuration file")
+    parser.add_argument("--output", default="project_dump.txt", help="Output file name")
     args = parser.parse_args()
-    project_dir = Path(args.project_dir)
-
-    if not project_dir.is_dir():
-        print(f"Error: Project directory '{args.project_dir}' not found or is not a directory.")
-        return
-
-    config, config_source_msg = load_config(args.config)
-    ignored_dirs = config.get("ignored_dirs", []) # Should always exist
-    allowed_extensions = config.get("allowed_extensions", []) # Should always exist
-
-    print(f"Starting project dump for: {project_dir.resolve()}")
+    
+    # Load configuration using pathlib for robust path handling
+    config = load_config(args.config)
+    
+    allowed_extensions = config.get("allowed_extensions", [])
+    ignored_dirs = config.get("ignored_dirs", [])
+    
+    # Convert strings to lowercase for case-insensitive comparison
+    allowed_extensions = [ext.lower() if ext.startswith('.') else ext for ext in allowed_extensions]
+    
+    # Normalize and resolve the project path
+    project_path = os.path.abspath(args.path)
+    
+    print(f"Starting project dump for: {project_path}")
     print(f"Ignoring directories: {ignored_dirs}")
     print(f"Allowing extensions/files: {allowed_extensions}")
     print(f"Output file: {args.output}")
-
-    tree_string, files_to_dump = build_tree(project_dir.resolve(), ignored_dirs, allowed_extensions)
-
-    # Prepare header content
-    header_content = f"""# Project Dump for: {project_dir.resolve()}
-# Config Source: {config_source_msg}
-#
-# Ignored Directories:
-{format_list_for_header(ignored_dirs)}
-#
-# Allowed Extensions/Files:
-{format_list_for_header(allowed_extensions)}
-"""
-
-    if not tree_string and not files_to_dump:
-        print("No files or directories found matching the criteria.")
-        try:
-            with open(args.output, 'w', encoding='utf-8') as outfile:
-                 outfile.write(header_content) # Write header even if empty
-                 outfile.write("\nNo files or directories found matching the criteria.\n")
-            print(f"Empty dump file created: {args.output}")
-        except Exception as e:
-             print(f"\nError writing empty output file '{args.output}': {e}")
-        return
-
-    try:
-        with open(args.output, 'w', encoding='utf-8') as outfile:
-            outfile.write(header_content) # Write the detailed header
-            outfile.write("\n" + "=" * 80 + "\n")
-            outfile.write(" " * 30 + "DIRECTORY TREE\n")
-            outfile.write("=" * 80 + "\n\n")
-            outfile.write(tree_string)
-
-            dump_files(project_dir.resolve(), files_to_dump, outfile)
-
-        print(f"\nProject dump successfully created: {args.output}")
-        print(f"Included {len(files_to_dump)} files in the dump.")
-
-    except Exception as e:
-        print(f"\nError writing output file '{args.output}': {e}")
+    
+    # Generate the dump
+    file_count = dump_file_contents(project_path, args.output, ignored_dirs, allowed_extensions)
+    
+    print(f"Project dump successfully created: {args.output}")
+    print(f"Included {file_count} files in the dump.")
 
 if __name__ == "__main__":
     main()

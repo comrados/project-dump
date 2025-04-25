@@ -9,7 +9,8 @@
         ".dockerfile",
         "Dockerfile",
         ".gitignore",
-        ".dockerignore"
+        ".dockerignore",
+        ".tex"
     ],
     "ignored_dirs": [
         ".git",
@@ -20,6 +21,7 @@
         "venv",
         ".env",
         "dist",
-        "build"
+        "build",
+        "graphics"
     ]
 }
