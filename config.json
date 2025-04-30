@@ -10,7 +10,8 @@
         "Dockerfile",
         ".gitignore",
         ".dockerignore",
-        ".tex"
+        ".tex",
+        ".md"
     ],
     "ignored_dirs": [
         ".git",

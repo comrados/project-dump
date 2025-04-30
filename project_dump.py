@@ -93,23 +93,25 @@ def dump_file_contents(path, output_file, ignored_dirs, allowed_extensions):
     )
     
     with open(output_file, 'w', encoding='utf-8') as f:
-        # Write header
-        f.write(f"# PROJECT DUMP: {os.path.abspath(path)}\n")
-        f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        # Write header with clear delimiters
+        f.write("<<PROJECT_INFO>>\n")
+        f.write(f"PROJECT_PATH: {os.path.abspath(path)}\n")
+        f.write(f"GENERATED_DATE: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("<<PROJECT_INFO_END>>\n\n")
         
         # Write tree structure
-        f.write("## Directory Structure\n```\n")
+        f.write("<<DIRECTORY_STRUCTURE>>\n")
         f.write(f"{os.path.basename(path)}/\n")
         f.write(tree_structure)
-        f.write("```\n\n")
+        f.write("<<DIRECTORY_STRUCTURE_END>>\n\n")
         
-        # Write file contents
-        f.write("## File Contents\n\n")
-        
+        # Write file contents with clear delimiters
         file_count = 0
         for file_path in sorted(processed_files):
             rel_path = os.path.relpath(file_path, path)
-            f.write(f"### {rel_path}\n```\n")
+            f.write(f"<<FILE>>\n")
+            f.write(f"FILE_PATH: {rel_path}\n")
+            f.write("<<CONTENT_START>>\n")
             
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
@@ -117,7 +119,7 @@ def dump_file_contents(path, output_file, ignored_dirs, allowed_extensions):
             except Exception as e:
                 f.write(f"[Error reading file: {str(e)}]\n")
             
-            f.write("\n```\n\n")
+            f.write("<<CONTENT_END>>\n\n")
             file_count += 1
             
     return file_count
